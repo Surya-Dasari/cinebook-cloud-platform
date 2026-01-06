@@ -8,10 +8,9 @@ pipeline {
 
         SERVICE_DIR = "services/show-catalog-service"
         K8S_DIR = "services/show-catalog-service/k8s"
-        MAVEN_SETTINGS = "/var/lib/jenkins/.m2/settings.xml"
 
-        OCP_API = "https://api.rm2.thpm.p1.openshiftapps.com:6443"
-        OCP_PROJECT = "suryadasari31-dev"
+        MAVEN_SETTINGS = "/var/lib/jenkins/.m2/settings.xml"
+        // OCP_API and OCP_PROJECT come from Jenkins global env vars
     }
 
     stages {
@@ -49,10 +48,10 @@ pipeline {
                         passwordVariable: 'DOCKER_PASS'
                     )
                 ]) {
-                    sh '''
+                    sh """
                         echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                        docker push '"${IMAGE}"'
-                    '''
+                        docker push ${IMAGE}
+                    """
                 }
             }
         }
@@ -65,32 +64,32 @@ pipeline {
                         variable: 'OS_TOKEN'
                     )
                 ]) {
-                    sh '''
+                    sh """
                         oc logout || true
-                        oc login '"${OCP_API}"' --token="$OS_TOKEN" --insecure-skip-tls-verify=true
-                        oc project '"${OCP_PROJECT}"'
-                    '''
+                        oc login $OCP_API --token=$OS_TOKEN --insecure-skip-tls-verify=true
+                        oc project $OCP_PROJECT
+                    """
                 }
             }
         }
 
         stage('Deploy to OpenShift') {
             steps {
-                sh '''
-                    oc apply -f '"${K8S_DIR}"'/deployment.yaml
-                    oc apply -f '"${K8S_DIR}"'/service.yaml
-                    oc apply -f '"${K8S_DIR}"'/route.yaml
-                '''
+                sh """
+                    oc apply -f ${K8S_DIR}/deployment.yaml
+                    oc apply -f ${K8S_DIR}/service.yaml
+                    oc apply -f ${K8S_DIR}/route.yaml
+                """
             }
         }
     }
 
     post {
         success {
-            echo 'CI/CD pipeline completed successfully'
+            echo "CI/CD pipeline completed successfully"
         }
         failure {
-            echo 'CI/CD pipeline failed'
+            echo "CI/CD pipeline failed"
         }
     }
 }
