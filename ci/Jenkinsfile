@@ -1,0 +1,90 @@
+pipeline {
+    agent any
+
+    environment {
+        APP_NAME     = "show-catalog-service"
+        VERSION      = "1.0.1"
+        IMAGE        = "suryadasari31/show-catalog-service:${VERSION}"
+        SERVICE_DIR  = "services/show-catalog-service"
+        K8S_DIR      = "services/show-catalog-service/k8s"
+        OCP_API      = "https://api.rm2.thpm.p1.openshiftapps.com:6443"
+        OCP_PROJECT  = "suryadasari31-dev"
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/<your-github-username>/cinebook-cloud-platform.git'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                dir("${SERVICE_DIR}") {
+                    sh 'mvn clean package'
+                }
+            }
+        }
+
+        stage('Publish Artifact to Nexus') {
+            steps {
+                dir("${SERVICE_DIR}") {
+                    sh 'mvn deploy'
+                }
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                dir("${SERVICE_DIR}") {
+                    sh "docker build -t ${IMAGE} ."
+                }
+            }
+        }
+
+        stage('Docker Push') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh """
+                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                    docker push ${IMAGE}
+                    """
+                }
+            }
+        }
+
+        stage('Authenticate to OpenShift (ServiceAccount)') {
+            steps {
+                withCredentials([string(
+                    credentialsId: 'openshift-sa-token',
+                    variable: 'OS_TOKEN'
+                )]) {
+                    sh """
+                    oc logout || true
+                    oc login ${OCP_API} \
+                      --token=$OS_TOKEN \
+                      --insecure-skip-tls-verify=true
+                    oc project ${OCP_PROJECT}
+                    """
+                }
+            }
+        }
+
+        stage('Deploy to OpenShift') {
+            steps {
+                sh """
+                oc apply -f ${K8S_DIR}/deployment.yaml
+                oc apply -f ${K8S_DIR}/service.yaml
+                oc apply -f ${K8S_DIR}/route.yaml
+                """
+            }
+        }
+    }
+}
+
