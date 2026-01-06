@@ -11,4 +11,18 @@ target/
 
 # Secrets
 *.env
+# Maven build output
+target/
+
+# CLI binaries / archives
+*.tar.gz
+oc
+kubectl
+
+# Logs
+*.log
+
+# IDE
+.idea/
+.vscode/
 
