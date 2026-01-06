@@ -10,6 +10,7 @@ pipeline {
         K8S_DIR = "services/show-catalog-service/k8s"
 
         MAVEN_SETTINGS = "/var/lib/jenkins/.m2/settings.xml"
+        OC_BIN = "$HOME/bin/oc"
         // OCP_API and OCP_PROJECT come from Jenkins global env vars
     }
 
@@ -49,7 +50,7 @@ pipeline {
                     )
                 ]) {
                     sh """
-                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        echo "\$DOCKER_PASS" | docker login -u "\$DOCKER_USER" --password-stdin
                         docker push ${IMAGE}
                     """
                 }
@@ -64,35 +65,25 @@ pipeline {
                         variable: 'OS_TOKEN'
                     )
                 ]) {
-                    sh """
-                        oc logout || true
-                        oc login $OCP_API --token=$OS_TOKEN --insecure-skip-tls-verify=true
-                        oc project $OCP_PROJECT
-                    """
+                    sh '''
+                        "$OC_BIN" logout || true
+                        "$OC_BIN" login "$OCP_API" --token="$OS_TOKEN" --insecure-skip-tls-verify=true
+                        "$OC_BIN" project "$OCP_PROJECT"
+                    '''
                 }
             }
         }
 
-        stage('Authenticate to OpenShift') {
-    steps {
-        withCredentials([
-            string(credentialsId: 'openshift-sa-token', variable: 'OS_TOKEN')
-        ]) {
-            sh '''
-                if [ ! -f oc ]; then
-                  curl -LO https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz
-                  tar -xzf openshift-client-linux.tar.gz
-                  chmod +x oc
-                fi
-
-                ./oc logout || true
-                ./oc login "$OCP_API" --token="$OS_TOKEN" --insecure-skip-tls-verify=true
-                ./oc project "$OCP_PROJECT"
-            '''
+        stage('Deploy to OpenShift') {
+            steps {
+                sh '''
+                    "$OC_BIN" apply -f '"${K8S_DIR}"'/deployment.yaml
+                    "$OC_BIN" apply -f '"${K8S_DIR}"'/service.yaml
+                    "$OC_BIN" apply -f '"${K8S_DIR}"'/route.yaml
+                '''
+            }
         }
     }
-}
-
 
     post {
         success {
