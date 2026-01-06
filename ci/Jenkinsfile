@@ -16,7 +16,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 git branch: 'main',
-                    url: 'https://github.com/<your-github-username>/cinebook-cloud-platform.git'
+                    url: 'https://github.com/Surya-Dasari/cinebook-cloud-platform.git'
             }
         }
 
