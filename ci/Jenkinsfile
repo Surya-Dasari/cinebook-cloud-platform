@@ -3,15 +3,15 @@ pipeline {
 
     environment {
         APP_NAME = "show-catalog-service"
-        VERSION = "1.0.1"
-        IMAGE = "suryadasari31/show-catalog-service:${VERSION}"
+        VERSION  = "1.0.1"
+        IMAGE    = "suryadasari31/show-catalog-service:${VERSION}"
 
         SERVICE_DIR = "services/show-catalog-service"
-        K8S_DIR = "services/show-catalog-service/k8s"
+        K8S_DIR     = "services/show-catalog-service/k8s"
 
         MAVEN_SETTINGS = "/var/lib/jenkins/.m2/settings.xml"
-        OC_BIN = "$HOME/bin/oc"
-        // OCP_API and OCP_PROJECT come from Jenkins global env vars
+        OC_BIN = "/var/lib/jenkins/bin/oc"
+        // OCP_API and OCP_PROJECT come from Jenkins Global Env Vars
     }
 
     stages {
@@ -66,9 +66,9 @@ pipeline {
                     )
                 ]) {
                     sh '''
-                        "$OC_BIN" logout || true
-                        "$OC_BIN" login "$OCP_API" --token="$OS_TOKEN" --insecure-skip-tls-verify=true
-                        "$OC_BIN" project "$OCP_PROJECT"
+                        /var/lib/jenkins/bin/oc logout || true
+                        /var/lib/jenkins/bin/oc login "$OCP_API" --token="$OS_TOKEN" --insecure-skip-tls-verify=true
+                        /var/lib/jenkins/bin/oc project "$OCP_PROJECT"
                     '''
                 }
             }
@@ -77,9 +77,9 @@ pipeline {
         stage('Deploy to OpenShift') {
             steps {
                 sh '''
-                    "$OC_BIN" apply -f '"${K8S_DIR}"'/deployment.yaml
-                    "$OC_BIN" apply -f '"${K8S_DIR}"'/service.yaml
-                    "$OC_BIN" apply -f '"${K8S_DIR}"'/route.yaml
+                    /var/lib/jenkins/bin/oc apply -f $K8S_DIR/deployment.yaml
+                    /var/lib/jenkins/bin/oc apply -f $K8S_DIR/service.yaml
+                    /var/lib/jenkins/bin/oc apply -f $K8S_DIR/route.yaml
                 '''
             }
         }
