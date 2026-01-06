@@ -73,16 +73,26 @@ pipeline {
             }
         }
 
-        stage('Deploy to OpenShift') {
-            steps {
-                sh """
-                    oc apply -f ${K8S_DIR}/deployment.yaml
-                    oc apply -f ${K8S_DIR}/service.yaml
-                    oc apply -f ${K8S_DIR}/route.yaml
-                """
-            }
+        stage('Authenticate to OpenShift') {
+    steps {
+        withCredentials([
+            string(credentialsId: 'openshift-sa-token', variable: 'OS_TOKEN')
+        ]) {
+            sh '''
+                if [ ! -f oc ]; then
+                  curl -LO https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz
+                  tar -xzf openshift-client-linux.tar.gz
+                  chmod +x oc
+                fi
+
+                ./oc logout || true
+                ./oc login "$OCP_API" --token="$OS_TOKEN" --insecure-skip-tls-verify=true
+                ./oc project "$OCP_PROJECT"
+            '''
         }
     }
+}
+
 
     post {
         success {
