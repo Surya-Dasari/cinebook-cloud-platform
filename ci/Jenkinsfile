@@ -5,86 +5,63 @@ pipeline {
         APP_NAME     = "show-catalog-service"
         VERSION      = "1.0.1"
         IMAGE        = "suryadasari31/show-catalog-service:${VERSION}"
-        SERVICE_DIR  = "services/show-catalog-service"
-        K8S_DIR      = "services/show-catalog-service/k8s"
-        OCP_API      = "https://api.rm2.thpm.p1.openshiftapps.com:6443"
-        OCP_PROJECT  = "suryadasari31-dev"
+
+        SERVICE_DIR = "services/show-catalog-service"
+        K8S_DIR     = "services/show-catalog-service/k8s"
+
+        MAVEN_SETTINGS = "/var/lib/jenkins/.m2/settings.xml"
+
+        OCP_API     = "https://api.rm2.thpm.p1.openshiftapps.com:6443"
+        OCP_PROJECT = "suryadasari31-dev"
     }
 
     stages {
 
-        stage('Checkout') {
-            steps {
-                git branch: 'main',
-                    url: 'https://github.com/Surya-Dasari/cinebook-cloud-platform.git'
-            }
-        }
-
+        /* -------------------------------------------------
+           BUILD STAGE
+           ------------------------------------------------- */
         stage('Build') {
             steps {
                 dir("${SERVICE_DIR}") {
-                    sh 'mvn clean package'
+                    sh """
+                    mvn -s ${MAVEN_SETTINGS} clean package
+                    """
                 }
             }
         }
 
+        /* -------------------------------------------------
+           PUBLISH ARTIFACT TO NEXUS
+           ------------------------------------------------- */
         stage('Publish Artifact to Nexus') {
             steps {
                 dir("${SERVICE_DIR}") {
-                    sh 'mvn deploy'
+                    sh """
+                    mvn -s ${MAVEN_SETTINGS} deploy
+                    """
                 }
             }
         }
 
+        /* -------------------------------------------------
+           DOCKER BUILD
+           ------------------------------------------------- */
         stage('Docker Build') {
             steps {
                 dir("${SERVICE_DIR}") {
-                    sh "docker build -t ${IMAGE} ."
+                    sh """
+                    docker build -t ${IMAGE} .
+                    """
                 }
             }
         }
 
+        /* -------------------------------------------------
+           DOCKER PUSH
+           ------------------------------------------------- */
         stage('Docker Push') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-creds',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-                    sh """
-                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                    docker push ${IMAGE}
-                    """
-                }
-            }
-        }
-
-        stage('Authenticate to OpenShift (ServiceAccount)') {
-            steps {
-                withCredentials([string(
-                    credentialsId: 'openshift-sa-token',
-                    variable: 'OS_TOKEN'
-                )]) {
-                    sh """
-                    oc logout || true
-                    oc login ${OCP_API} \
-                      --token=$OS_TOKEN \
-                      --insecure-skip-tls-verify=true
-                    oc project ${OCP_PROJECT}
-                    """
-                }
-            }
-        }
-
-        stage('Deploy to OpenShift') {
-            steps {
-                sh """
-                oc apply -f ${K8S_DIR}/deployment.yaml
-                oc apply -f ${K8S_DIR}/service.yaml
-                oc apply -f ${K8S_DIR}/route.yaml
-                """
-            }
-        }
-    }
-}
-
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-creds',
+                        usernameVariable: 'DOCKER_USER',
